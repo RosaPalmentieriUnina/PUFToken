@@ -1,0 +1,26 @@
+# Directory generate da CMake
+build/
+cmake-build-*/
+
+# File prodotti dalla compilazione
+*.o
+*.obj
+*.exe
+*.out
+*.elf
+*.bin
+*.hex
+*.map
+
+# Visual Studio Code
+.vscode/
+
+# Visual Studio
+.vs/
+
+# CLion / IntelliJ
+.idea/
+
+# File temporanei
+*.tmp
+*.log
