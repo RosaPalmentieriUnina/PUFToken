@@ -18,6 +18,7 @@ add_executable(
     dev_protocol/puftoken_dev.cc
     ps_protocol/puftoken_ps.cc
     crypto/puftoken_crypto.cc
+    puf/puftoken_puf.cc
     setup/puftoken_setup.cc
 )
 
@@ -28,6 +29,7 @@ target_include_directories(
         ${CMAKE_CURRENT_SOURCE_DIR}/dev_protocol
         ${CMAKE_CURRENT_SOURCE_DIR}/ps_protocol
         ${CMAKE_CURRENT_SOURCE_DIR}/crypto
+        ${CMAKE_CURRENT_SOURCE_DIR}/puf
         ${CMAKE_CURRENT_SOURCE_DIR}/setup
 )
 

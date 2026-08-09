@@ -11,8 +11,8 @@ typedef uint16_t token_count_t;         /* Type used for ATS, RL, NRL and token 
 #define MAX_ISS_TOK 100                 /* Number of tokens generated during the initialization */
 #define MAX_TOK_PER_SPEND MAX_ISS_TOK   /* Maximum number of tokens transferable in a single transaction */
 
-#define KEY_SIZE 16                     /* Lenght of AES-128 Key */
-#define BLOCK_SIZE 16                   /* AES-128 Criptography Block */
+#define KEY_SIZE 16                     /* Lenght of Key (128 bit)*/
+#define BLOCK_SIZE 16                   /* Lenght of Encrypted Block */
 #define BANK_PUBLIC_KEY_SIZE 16         /* Temporary sizes used for the simulated asymmetric primitive */
 #define BANK_PRIVATE_KEY_SIZE 16        /* Temporary sizes used for the simulated asymmetric primitive */
 #define BANK_SIGNATURE_SIZE 16          /* Temporary sizes used for the simulated asymmetric primitive */
@@ -52,7 +52,7 @@ typedef enum
     SPEND_RESULT
 } puftoken_message_t;
 
-
+/* Logical protocol outcomes exchanged between the Device and the Payment System. */
 typedef enum
 {
     STATUS_OK,
@@ -62,6 +62,7 @@ typedef enum
     STATUS_INVALID_TOKEN
 } puftoken_status_t;
 
+/* Technical return values used by functions to indicate success or failure. */
 typedef enum
 {
     RET_OK,
@@ -69,7 +70,8 @@ typedef enum
     RET_INVALID_STATE,
     RET_INVALID_PACKET,
     RET_BUFFER_TOO_SMALL,
-    RET_CRYPTO_ERROR
+    RET_CRYPTO_ERROR,
+    RET_SIGNATURE_INVALID
 } puftoken_ret_t;
 
 
