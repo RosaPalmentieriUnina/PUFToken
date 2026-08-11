@@ -1,4 +1,5 @@
 #include "puftoken_dev.h"
+#include "../crypto/puftoken_crypto.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -27,7 +28,7 @@ puftoken_ret_t puftoken_dev_setup(
         return RET_INVALID_ARGUMENT;
     }
 
-    memset(dev, 0, sizeof(*dev));       /* riempie di zero tutta la memoria occupata dalla struttura Device */
+    memset(dev, 0, sizeof(*dev));
 
     dev->id = dev_id;
     dev->ps_id = ps_id;
@@ -68,6 +69,67 @@ puftoken_ret_t puftoken_dev_setup(
     dev->unicast_is_present = 0U;
 
     dev->dev_state = DEV_READY;
+
+    return RET_OK;
+}
+
+puftoken_ret_t puftoken_dev_start_spending(Device* const dev, const token_count_t ats) {
+    
+    if (dev == NULL) {
+        return RET_INVALID_ARGUMENT;
+    }
+
+    if (dev->dev_state != DEV_READY) {
+        return RET_INVALID_STATE;
+    }
+
+    if (ats == 0U) {
+        return RET_INVALID_ARGUMENT;
+    }
+
+    if (dev->unicast_tsmt_buff == NULL) {
+        return RET_INVALID_STATE;
+    }
+
+    if (dev->unicast_tsmt_capacity < SPEND_REQUEST_SIZE) {
+        return RET_BUFFER_TOO_SMALL;
+    }
+
+    puftoken_block_t state_plaintext = {};
+
+    PUF_LINK_TO_U8_BE(dev->q, state_plaintext.bytes);
+    TOKEN_COUNT_TO_U8_BE(dev->rl, &state_plaintext.bytes[sizeof(puf_link_t)]);
+
+    puftoken_block_t encrypted_state = {};
+
+    const puftoken_ret_t crypto_result = puftoken_symmetric_encrypt(&dev->ra, &state_plaintext, &encrypted_state);
+
+    if (crypto_result != RET_OK) {
+        return crypto_result;
+    }
+
+    size_t offset = 0U;
+
+    dev->unicast_tsmt_buff[offset] = (uint8_t)SPEND_REQUEST;
+    offset += MESSAGE_TYPE_SIZE;
+
+    ID_TO_U8_BE(dev->id, &dev->unicast_tsmt_buff[offset]);
+    offset += ID_SIZE;
+
+    memcpy(&dev->unicast_tsmt_buff[offset], encrypted_state.bytes, BLOCK_SIZE);
+    offset += BLOCK_SIZE;
+
+    memcpy(&dev->unicast_tsmt_buff[offset], dev->certified_state.bytes, BANK_SIGNATURE_SIZE);
+    offset += BANK_SIGNATURE_SIZE;
+
+    TOKEN_COUNT_TO_U8_BE(ats, &dev->unicast_tsmt_buff[offset]);
+    offset += TOKEN_COUNT_SIZE;
+
+    dev->ats = ats;
+    dev->nrl = 0U;
+    dev->unicast_tsmt_len = (uint32_t)offset;
+    dev->unicast_is_present = 1U;
+    dev->dev_state = DEV_WAIT_SPEND_AUTH;
 
     return RET_OK;
 }

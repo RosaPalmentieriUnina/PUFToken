@@ -15,43 +15,39 @@ typedef uint16_t token_count_t;         /* Type used for ATS, RL, NRL and token 
 #define BANK_SIGNATURE_SIZE 16          /* Temporary sizes used for the simulated asymmetric primitive */
 
 
-typedef struct
-{
+typedef struct {
     uint8_t bytes[KEY_SIZE];
 } puftoken_key_t;                       /* Session key RA. */
 
-typedef struct
-{
+typedef struct {
     uint8_t bytes[BLOCK_SIZE];
 } puftoken_block_t;                     /* Fixed-size 128-bit block used by cryptographic operations */
 
-typedef struct
-{
+typedef struct {
     uint8_t bytes[BANK_PUBLIC_KEY_SIZE];
 } puftoken_bank_public_key_t;           /* Public key of the Bank */
 
-typedef struct
-{
+typedef struct {
     uint8_t bytes[BANK_PRIVATE_KEY_SIZE];
 } puftoken_bank_private_key_t;          /* Private key of the Bank */
 
-typedef struct
-{
+typedef struct {
     uint8_t bytes[BANK_SIGNATURE_SIZE];
 
 } puftoken_bank_signature_t;            /* Signature produced by the Bank using its private key */
 
-typedef enum
-{
+
+typedef enum {
     SPEND_REQUEST,
     SPEND_AUTH_RESULT,
     TOKEN_BATCH,
     SPEND_RESULT
 } puftoken_message_t;
 
-/* Logical protocol outcomes exchanged between the Device and the Payment System. */
-typedef enum
-{
+/**
+ * Logical protocol outcomes exchanged between the Device and the Payment System.
+ */
+ typedef enum {
     STATUS_OK,
     STATUS_INTEGRITY_FAIL,
     STATUS_INVALID_AMOUNT,
@@ -59,9 +55,10 @@ typedef enum
     STATUS_INVALID_TOKEN
 } puftoken_status_t;
 
-/* Technical return values used by functions to indicate success or failure. */
-typedef enum
-{
+/**
+ * Technical return values used by functions to indicate success or failure. 
+ */
+ typedef enum {
     RET_OK,
     RET_INVALID_ARGUMENT,
     RET_INVALID_STATE,
@@ -84,13 +81,12 @@ typedef enum
  */
 #define STATE_PLAINTEXT_SIZE (sizeof(puf_link_t) + sizeof(token_count_t))
 
-
 /**
- * TYPE | DEVICE_ID | ATS | ENC_RA(Q || RL) | ENC_BANK(Q || RL)
+ * TYPE | DEVICE_ID | ENC_RA(Q || RL) | BANK_SIGNATURE(Q || RL) | ATS
  */
-#define SPEND_REQUEST_SIZE (MESSAGE_TYPE_SIZE + ID_SIZE + TOKEN_COUNT_SIZE + BLOCK_SIZE + BANK_SIGNATURE_SIZE)
+#define SPEND_REQUEST_SIZE (MESSAGE_TYPE_SIZE + ID_SIZE + BLOCK_SIZE + BANK_SIGNATURE_SIZE + TOKEN_COUNT_SIZE)
 
-/**
+    /**
  * TYPE | PS_ID | STATUS
  */
 #define SPEND_AUTH_RESULT_BASE_SIZE (MESSAGE_TYPE_SIZE + ID_SIZE + STATUS_SIZE)
@@ -105,31 +101,20 @@ typedef enum
 #define TOKEN_BATCH_BASE_SIZE (MESSAGE_TYPE_SIZE + ID_SIZE + TOKEN_COUNT_SIZE)
 
 #define TOKEN_BATCH_SIZE(token_count) (TOKEN_BATCH_BASE_SIZE + ((size_t)(token_count) * TOKEN_PAIR_SIZE))
+
 /**
  * TYPE | PS_ID | STATUS
  */
 #define SPEND_RESULT_SIZE (MESSAGE_TYPE_SIZE + ID_SIZE + STATUS_SIZE)
 
 
-#define U8_TO_PUFTOKEN_ID_BE(buff) \
-    (((puftoken_id_t)(*(buff)) << 8) | \
-     (puftoken_id_t)(*((buff) + 1)))
+#define U8_TO_ID_BE(buff) (((puftoken_id_t)(*(buff)) << 8) | (puftoken_id_t)(*((buff) + 1)))
 
-#define id_tO_U8_BE(id, buff) \
-{ \
-    *((buff)) = (uint8_t)((id) >> 8); \
-    *((buff) + 1) = (uint8_t)(id); \
-}
+#define ID_TO_U8_BE(id, buff) { *((buff)) = (uint8_t)((id) >> 8); *((buff) + 1) = (uint8_t)(id); }
 
-#define U8_TO_TOKEN_COUNT_BE(buff) \
-    (((token_count_t)(*(buff)) << 8) | \
-     (token_count_t)(*((buff) + 1)))
+#define U8_TO_TOKEN_COUNT_BE(buff) (((token_count_t)(*(buff)) << 8) | (token_count_t)(*((buff) + 1)))
 
-#define TOKEN_COUNT_TO_U8_BE(count, buff) \
-{ \
-    *((buff)) = (uint8_t)((count) >> 8); \
-    *((buff) + 1) = (uint8_t)(count); \
-}
+#define TOKEN_COUNT_TO_U8_BE(count, buff) { *((buff)) = (uint8_t)((count) >> 8); *((buff) + 1) = (uint8_t)(count); }
 
 #define U8_TO_PUF_LINK_BE(buff) \
     (((uint32_t)(*((buff))) << 24) | \
@@ -137,8 +122,7 @@ typedef enum
      ((uint32_t)(*((buff) + 2)) << 8) | \
      (uint32_t)(*((buff) + 3)))
 
-#define PUF_LINK_TO_U8_BE(link, buff) \
-{ \
+#define PUF_LINK_TO_U8_BE(link, buff) { \
     *((buff)) = (uint8_t)((link) >> 24); \
     *((buff) + 1) = (uint8_t)((link) >> 16); \
     *((buff) + 2) = (uint8_t)((link) >> 8); \

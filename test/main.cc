@@ -573,6 +573,128 @@ int main()
 
     printf("First setup token verified correctly.\n");
     
+    printf(
+    "\n---------------------- SPEND REQUEST TEST ----------------------\n");
+
+    const token_count_t spend_test_ats = 3U;
+
+    const puftoken_ret_t spend_request_result =
+        puftoken_dev_start_spending(
+            &setup_dev,
+            spend_test_ats);
+
+    if (spend_request_result != RET_OK) {
+        printf("SPEND_REQUEST generation failed.\n");
+        return 1;
+    }
+
+    if ((setup_dev.dev_state != DEV_WAIT_SPEND_AUTH) ||
+        (setup_dev.ats != spend_test_ats) ||
+        (setup_dev.unicast_is_present != 1U) ||
+        (setup_dev.unicast_tsmt_len != SPEND_REQUEST_SIZE)) {
+
+        printf("Device state after SPEND_REQUEST is invalid.\n");
+        return 1;
+    }
+
+    if ((setup_dev.q != setup_initial_q) || (setup_dev.rl != setup_token_count)) {
+        printf("Q or RL changed while constructing SPEND_REQUEST.\n");
+        return 1;
+    }
+
+    size_t request_offset = 0U;
+
+    if (setup_dev.unicast_tsmt_buff[request_offset] != (uint8_t)SPEND_REQUEST) {
+        printf("Invalid SPEND_REQUEST message type.\n");
+        return 1;
+    }
+
+    request_offset += MESSAGE_TYPE_SIZE;
+
+    const puftoken_id_t request_dev_id = U8_TO_ID_BE(&setup_dev.unicast_tsmt_buff[request_offset]);
+
+    if (request_dev_id != setup_dev.id) {
+        printf("Invalid Device ID in SPEND_REQUEST.\n");
+        return 1;
+    }
+
+    request_offset += ID_SIZE;
+
+    puftoken_block_t request_encrypted_state = {};
+    puftoken_block_t request_plaintext = {};
+
+    memcpy(
+        request_encrypted_state.bytes,
+        &setup_dev.unicast_tsmt_buff[request_offset],
+        BLOCK_SIZE);
+
+    request_offset += BLOCK_SIZE;
+
+    if (puftoken_symmetric_decrypt(
+        &setup_dev.ra,
+        &request_encrypted_state,
+        &request_plaintext) != RET_OK) {
+        printf("SPEND_REQUEST state decryption failed.\n");
+        return 1;
+    }
+
+    const puf_link_t request_q =
+    U8_TO_PUF_LINK_BE(
+        request_plaintext.bytes);
+
+    const token_count_t request_rl =
+        U8_TO_TOKEN_COUNT_BE(
+            &request_plaintext.bytes[sizeof(puf_link_t)]);
+
+    if ((request_q != setup_initial_q) || (request_rl != setup_token_count)) {
+        printf("Invalid Q or RL inside SPEND_REQUEST.\n");
+        return 1;
+    }
+
+    puftoken_bank_signature_t request_certified_state = {};
+
+    memcpy(
+        request_certified_state.bytes,
+        &setup_dev.unicast_tsmt_buff[request_offset],
+        BANK_SIGNATURE_SIZE);
+
+    request_offset += BANK_SIGNATURE_SIZE;
+
+    if (memcmp(
+        &request_certified_state,
+        &setup_dev.certified_state,
+        sizeof(request_certified_state)) != 0) {
+        printf("Certified state mismatch in SPEND_REQUEST.\n");
+        return 1;
+    }
+
+    if (puftoken_bank_verify(
+            &setup_ps.bank_public_key,
+            request_plaintext.bytes,
+            STATE_PLAINTEXT_SIZE,
+            &request_certified_state) != RET_OK) {
+        printf("SPEND_REQUEST certified state verification failed.\n");
+        return 1;
+    }
+
+    const token_count_t request_ats =
+    U8_TO_TOKEN_COUNT_BE(
+        &setup_dev.unicast_tsmt_buff[request_offset]);
+
+    request_offset += TOKEN_COUNT_SIZE;
+
+    if (request_ats != spend_test_ats) {
+        printf("Invalid ATS in SPEND_REQUEST.\n");
+        return 1;
+    }
+
+    if (request_offset != SPEND_REQUEST_SIZE) {
+        printf("Invalid SPEND_REQUEST size.\n");
+        return 1;
+    }
+
+    printf("SPEND_REQUEST generated and verified correctly.\n");
+
     puftoken_dev_cleanup(&dev);
     puftoken_dev_cleanup(&setup_dev);
 

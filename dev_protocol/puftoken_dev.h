@@ -36,7 +36,7 @@ typedef struct
     token_count_t nrl;                          /* NRL, New Remaining Links */
 
     uint8_t* unicast_tsmt_buff;                 /* Buffer containing the next packet that the Device must send to the Payment System */
-    size_t unicast_tsmt_capacity;
+    size_t unicast_tsmt_capacity;               /* Total number of bytes currently allocated for unicast_tsmt_buff */
     uint32_t unicast_tsmt_len;                  /* Actual number of valid bytes currently stored inside unicast_tsmt_buff */
     uint8_t unicast_is_present;                 /* Flag indicating whether a packet is ready to be transmitted */
 
@@ -92,9 +92,6 @@ puftoken_ret_t puftoken_dev_spend_auth_cb(
 
 /**
  * Processes the final SPEND_RESULT.
- *
- * Q is updated directly while generating the links to spend,
- * therefore no rollback of Q is performed if the payment fails.
  *
  * In case of ACCEPT, the Device stores the new certified state
  * received from the Payment System.
