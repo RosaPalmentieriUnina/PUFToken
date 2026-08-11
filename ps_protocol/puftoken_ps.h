@@ -24,10 +24,10 @@ typedef struct
     puftoken_id_t dev_id;              /* Identifier of the Device involved in the current transaction */
     PUFToken_PS_State ps_state;        /* Current state of the automaton */
 
-    puftoken_key_t ra;                          /* Key used to process messages sent from the Device to the Payment System */
-    puftoken_key_t rb;                          /* Key used to protect messages sent from the Payment System to the Device */
-    puftoken_bank_public_key_t bank_public_key; /* Symmetric key used in the proof of concept to verify values produced by the simulated Bank */
-
+    puftoken_key_t ra;                              /* Key used to process messages sent from the Device to the Payment System */
+    puftoken_bank_public_key_t bank_public_key;     /* Bank public key */
+    puftoken_bank_private_key_t bank_private_key;   /* Bank private key for this proof of concept*/
+    
     token_count_t ats;                 /* Amount To Spend requested by the Device */
     puf_link_t q;                      /* Current Q received from the Device */
     token_count_t rl;                  /* Current Remaining Links received from the Device */
@@ -51,8 +51,8 @@ puftoken_ret_t puftoken_ps_setup(
     PaymentSystem* const ps,
     const puftoken_id_t ps_id,
     const puftoken_key_t* const ra,
-    const puftoken_key_t* const rb,
-    const puftoken_bank_public_key_t* const bank_public_key);
+    const puftoken_bank_public_key_t* const bank_public_key,
+    const puftoken_bank_private_key_t* const bank_private_key);
 
 
 /**

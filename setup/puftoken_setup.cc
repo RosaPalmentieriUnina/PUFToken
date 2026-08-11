@@ -4,6 +4,7 @@
 #include "../puf/puftoken_puf.h"
 
 #include <string.h>
+#include <stdlib.h>
 
 
 /*
@@ -11,19 +12,16 @@
  * simulated session keys.
  */
 #define SIMULATED_RA_BASE 0x10U
-#define SIMULATED_RB_BASE 0x80U
 
 
 /*
  * Generates deterministic simulated session keys.
  */
-static void generate_simulated_session_keys(
-    puftoken_key_t* const ra,
-    puftoken_key_t* const rb)
+static void generate_simulated_session_key(
+    puftoken_key_t* const ra)
 {
     for (uint32_t i = 0U; i < KEY_SIZE; ++i) {
         ra->bytes[i] = (uint8_t)(SIMULATED_RA_BASE + i);
-        rb->bytes[i] = (uint8_t)(SIMULATED_RB_BASE + i);
     }
 }
 
@@ -41,10 +39,9 @@ puftoken_ret_t puftoken_setup(
     }
 
     /*
-     * At least one token must be issued and the Device
-     * cannot store more than MAX_ISS_TOK tokens.
+     * At least one token must be issued.
      */
-    if ((issued_token_count == 0U) || (issued_token_count > MAX_ISS_TOK)) {
+    if (issued_token_count == 0U) {
         return RET_INVALID_ARGUMENT;
     }
 
@@ -52,28 +49,32 @@ puftoken_ret_t puftoken_setup(
     memset(ps, 0, sizeof(*ps));
 
     puftoken_key_t ra = {};
-    puftoken_key_t rb = {};
 
     puftoken_bank_public_key_t bank_public_key = {};
     puftoken_bank_private_key_t bank_private_key = {};
 
     puftoken_bank_signature_t certified_state = {};
 
-    /*
-     * The complete token-signature array is static so that
-     * it is not allocated on the function stack.
-     *
-     * It is cleared at every setup execution.
-     */
-    static puftoken_bank_signature_t bank_tokens[MAX_ISS_TOK];
+    const size_t bank_tokens_size =
+        (size_t)issued_token_count * sizeof(puftoken_bank_signature_t);
 
-    memset(bank_tokens, 0, sizeof(bank_tokens));
+    puftoken_bank_signature_t* bank_tokens =
+        (puftoken_bank_signature_t*)malloc(bank_tokens_size);
 
-    generate_simulated_session_keys(&ra, &rb);
+    if (bank_tokens == NULL) {
+        return RET_MEMORY_ERROR;
+    }
+
+    memset(bank_tokens, 0, bank_tokens_size);
+
+    generate_simulated_session_key(&ra);
 
     puftoken_ret_t result = puftoken_bank_generate_key_pair(&bank_public_key, &bank_private_key);
 
     if (result != RET_OK) {
+        memset(&bank_private_key, 0, sizeof(bank_private_key));
+        free(bank_tokens);
+
         return result;
     }
 
@@ -95,6 +96,7 @@ puftoken_ret_t puftoken_setup(
 
     if (result != RET_OK) {
         memset(&bank_private_key, 0, sizeof(bank_private_key));
+        free(bank_tokens);
 
         return result;
     }
@@ -108,6 +110,7 @@ puftoken_ret_t puftoken_setup(
 
         if (result != RET_OK) {
             memset(&bank_private_key, 0, sizeof(bank_private_key));
+            free(bank_tokens);
 
             return result;
         }
@@ -123,6 +126,7 @@ puftoken_ret_t puftoken_setup(
 
         if (result != RET_OK) {
             memset(&bank_private_key, 0, sizeof(bank_private_key));
+            free(bank_tokens);
 
             return result;
         }
@@ -139,7 +143,6 @@ puftoken_ret_t puftoken_setup(
             dev_id,
             ps_id,
             &ra,
-            &rb,
             initial_q,
             initial_rl,
             issued_token_count,
@@ -148,22 +151,29 @@ puftoken_ret_t puftoken_setup(
 
     if (result != RET_OK) {
         memset(&bank_private_key, 0, sizeof(bank_private_key));
+        free(bank_tokens);
         memset(dev, 0, sizeof(*dev));
 
         return result;
     }
+
+    free(bank_tokens);
+    bank_tokens = NULL;
 
     result =
         puftoken_ps_setup(
             ps,
             ps_id,
             &ra,
-            &rb,
-            &bank_public_key);
+            &bank_public_key,
+            &bank_private_key);
 
     if (result != RET_OK)
     {
         memset(&bank_private_key, 0, sizeof(bank_private_key));
+
+        puftoken_dev_cleanup(dev);
+        
         memset(dev, 0, sizeof(*dev));
         memset(ps, 0, sizeof(*ps));
 

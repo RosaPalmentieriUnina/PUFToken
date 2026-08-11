@@ -8,9 +8,6 @@ typedef uint16_t puftoken_id_t;         /* Identifier of a protocol actor */
 typedef uint32_t puf_link_t;            /* Link of the PUF chain */
 typedef uint16_t token_count_t;         /* Type used for ATS, RL, NRL and token counters */
 
-#define MAX_ISS_TOK 100                 /* Number of tokens generated during the initialization */
-#define MAX_TOK_PER_SPEND MAX_ISS_TOK   /* Maximum number of tokens transferable in a single transaction */
-
 #define KEY_SIZE 16                     /* Lenght of Key (128 bit)*/
 #define BLOCK_SIZE 16                   /* Lenght of Encrypted Block */
 #define BANK_PUBLIC_KEY_SIZE 16         /* Temporary sizes used for the simulated asymmetric primitive */
@@ -21,12 +18,12 @@ typedef uint16_t token_count_t;         /* Type used for ATS, RL, NRL and token 
 typedef struct
 {
     uint8_t bytes[KEY_SIZE];
-} puftoken_key_t;                       /* Session key RA or RB. */
+} puftoken_key_t;                       /* Session key RA. */
 
 typedef struct
 {
     uint8_t bytes[BLOCK_SIZE];
-} puftoken_block_t;                     /* Encrypted block used both for protected links and for values produced by the simulated Bank */
+} puftoken_block_t;                     /* Fixed-size 128-bit block used by cryptographic operations */
 
 typedef struct
 {
@@ -70,6 +67,7 @@ typedef enum
     RET_INVALID_STATE,
     RET_INVALID_PACKET,
     RET_BUFFER_TOO_SMALL,
+    RET_MEMORY_ERROR,
     RET_CRYPTO_ERROR,
     RET_SIGNATURE_INVALID
 } puftoken_ret_t;
@@ -106,8 +104,7 @@ typedef enum
 
 #define TOKEN_BATCH_BASE_SIZE (MESSAGE_TYPE_SIZE + ID_SIZE + TOKEN_COUNT_SIZE)
 
-#define TOKEN_BATCH_MAX_SIZE (TOKEN_BATCH_BASE_SIZE + MAX_TOK_PER_SPEND * TOKEN_PAIR_SIZE)
-
+#define TOKEN_BATCH_SIZE(token_count) (TOKEN_BATCH_BASE_SIZE + ((size_t)(token_count) * TOKEN_PAIR_SIZE))
 /**
  * TYPE | PS_ID | STATUS
  */

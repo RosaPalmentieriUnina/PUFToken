@@ -38,4 +38,22 @@ puftoken_ret_t puftoken_bank_verify(
     const uint32_t data_len,
     const puftoken_bank_signature_t* const signature);
 
+/*
+ * Protects a fixed-size block using the session key RA.
+ */
+puftoken_ret_t puftoken_symmetric_encrypt(
+    const puftoken_key_t* const key,
+    const puftoken_block_t* const plaintext,
+    puftoken_block_t* const ciphertext);
+
+
+/*
+ * Recovers a fixed-size block protected with the session key RA.
+ */
+puftoken_ret_t puftoken_symmetric_decrypt(
+    const puftoken_key_t* const key,
+    const puftoken_block_t* const ciphertext,
+    puftoken_block_t* const plaintext);
+
+
 #endif

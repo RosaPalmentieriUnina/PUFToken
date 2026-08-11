@@ -4,6 +4,15 @@
 
 #include "puftoken_common.h"
 
+/*
+ * Weak functions can be replaced by a platform-specific
+ * implementation when the project is ported to the target board.
+ */
+#if defined(__GNUC__) || defined(__clang__)
+#define PUFTOKEN_WEAK __attribute__((weak))
+#else
+#define PUFTOKEN_WEAK
+#endif
 
 /*
  * Parameters used only by the simulated key-generation function.
@@ -26,7 +35,7 @@ static void puftoken_simulated_digest(
 }
 
 
-puftoken_ret_t puftoken_bank_generate_key_pair(
+PUFTOKEN_WEAK puftoken_ret_t puftoken_bank_generate_key_pair(
     puftoken_bank_public_key_t* const public_key,
     puftoken_bank_private_key_t* const private_key)
 {
@@ -56,7 +65,7 @@ puftoken_ret_t puftoken_bank_generate_key_pair(
     return RET_OK;
 }
 
-puftoken_ret_t puftoken_bank_sign(
+PUFTOKEN_WEAK puftoken_ret_t puftoken_bank_sign(
     const puftoken_bank_private_key_t* const private_key,
     const uint8_t* const data,
     const uint32_t data_len,
@@ -79,7 +88,7 @@ puftoken_ret_t puftoken_bank_sign(
     return RET_OK;
 }
 
-puftoken_ret_t puftoken_bank_verify(
+PUFTOKEN_WEAK puftoken_ret_t puftoken_bank_verify(
     const puftoken_bank_public_key_t* const public_key,
     const uint8_t* const data,
     const uint32_t data_len,
@@ -104,6 +113,46 @@ puftoken_ret_t puftoken_bank_verify(
 
     if (difference != 0U) {
         return RET_SIGNATURE_INVALID;
+    }
+
+    return RET_OK;
+}
+
+PUFTOKEN_WEAK puftoken_ret_t puftoken_symmetric_encrypt(
+    const puftoken_key_t* const key,
+    const puftoken_block_t* const plaintext,
+    puftoken_block_t* const ciphertext)
+{
+    if ((key == NULL) ||
+        (plaintext == NULL) ||
+        (ciphertext == NULL))
+    {
+        return RET_INVALID_ARGUMENT;
+    }
+
+    for (uint32_t i = 0U; i < BLOCK_SIZE; ++i) {
+        ciphertext->bytes[i] =
+            (uint8_t)(plaintext->bytes[i] ^ key->bytes[i]);
+    }
+
+    return RET_OK;
+}
+
+PUFTOKEN_WEAK puftoken_ret_t puftoken_symmetric_decrypt(
+    const puftoken_key_t* const key,
+    const puftoken_block_t* const ciphertext,
+    puftoken_block_t* const plaintext)
+{
+    if ((key == NULL) ||
+        (ciphertext == NULL) ||
+        (plaintext == NULL))
+    {
+        return RET_INVALID_ARGUMENT;
+    }
+
+    for (uint32_t i = 0U; i < BLOCK_SIZE; ++i) {
+        plaintext->bytes[i] =
+            (uint8_t)(ciphertext->bytes[i] ^ key->bytes[i]);
     }
 
     return RET_OK;

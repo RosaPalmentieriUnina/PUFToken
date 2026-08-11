@@ -25,21 +25,20 @@ typedef struct
     PUFToken_Dev_State dev_state;               /* Current state of the Device automaton */
 
     puftoken_key_t ra;                          /* Session key used to protect messages sent from the Device to the Payment System */
-    puftoken_key_t rb;                          /* Session key used to process messages sent from the Payment System to the Device */
 
     puf_link_t q;                               /* Q Register */
     token_count_t rl;                           /* Register RL, Remaining Links */
 
     token_count_t iss_tok_count;                /* Total number of tokens issued to the Device during the initialization phase */
     puftoken_bank_signature_t certified_state;  /* Certified state produced by the Bank: Q || RL */
-    puftoken_bank_signature_t bank_tokens[MAX_ISS_TOK];     /* Tokens approved by the Bank during the initialization phase */
+    puftoken_bank_signature_t* bank_tokens;     /* Tokens approved by the Bank during the initialization phase */
     token_count_t ats;                          /* ATS, Amount To Spend */
     token_count_t nrl;                          /* NRL, New Remaining Links */
-    puf_link_t q_tmp;                           /* Temporary copy of Q */
 
-    uint8_t unicast_tsmt_buff[TOKEN_BATCH_MAX_SIZE];   /* Buffer containing the next packet that the Device must send to the Payment System */
-    uint32_t unicast_tsmt_len;                         /* Actual number of valid bytes currently stored inside unicast_tsmt_buff */
-    uint8_t unicast_is_present;                        /* Flag indicating whether a packet is ready to be transmitted */
+    uint8_t* unicast_tsmt_buff;                 /* Buffer containing the next packet that the Device must send to the Payment System */
+    size_t unicast_tsmt_capacity;
+    uint32_t unicast_tsmt_len;                  /* Actual number of valid bytes currently stored inside unicast_tsmt_buff */
+    uint8_t unicast_is_present;                 /* Flag indicating whether a packet is ready to be transmitted */
 
 } Device;
 
@@ -57,13 +56,16 @@ puftoken_ret_t puftoken_dev_setup(
     const puftoken_id_t dev_id,
     const puftoken_id_t ps_id,
     const puftoken_key_t* const ra,
-    const puftoken_key_t* const rb,
     const puf_link_t initial_q,
     const token_count_t initial_rl,
     const token_count_t issued_token_count,
     const puftoken_bank_signature_t* const certified_state,
     const puftoken_bank_signature_t* const bank_tokens);
 
+/**
+ * Releases the dynamic memory owned by the Device.
+ */
+void puftoken_dev_cleanup(Device* const dev);
 
 /**
  * Starts a new spending transaction.
@@ -91,8 +93,11 @@ puftoken_ret_t puftoken_dev_spend_auth_cb(
 /**
  * Processes the final SPEND_RESULT.
  *
- * In case of ACCEPT, the function commits Q_tmp and NRL.
- * In case of INVALID_TOKEN, it performs a rollback.
+ * Q is updated directly while generating the links to spend,
+ * therefore no rollback of Q is performed if the payment fails.
+ *
+ * In case of ACCEPT, the Device stores the new certified state
+ * received from the Payment System.
  */
 puftoken_ret_t puftoken_dev_spend_result_cb(
     Device* const dev,

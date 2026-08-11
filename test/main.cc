@@ -17,21 +17,17 @@ int main()
     Device dev = {};
 
     puftoken_key_t ra = {};
-    puftoken_key_t rb = {};
 
     puftoken_bank_signature_t certified_state = {};
 
-    /*
-    * Static is used so that the complete token array is not
-    * allocated on the stack.
-    */
-    static puftoken_bank_signature_t bank_tokens[MAX_ISS_TOK] = {};
+    const token_count_t test_token_count = 10U;
+
+    puftoken_bank_signature_t bank_tokens[10] = {};
 
     /*
     * Assign recognizable test values.
     */
     ra.bytes[0] = 0xAAU;
-    rb.bytes[0] = 0xBBU;
 
     certified_state.bytes[0] = 0xCCU;
     bank_tokens[0].bytes[0] = 0xDDU;
@@ -42,10 +38,9 @@ int main()
             1U,
             2U,
             &ra,
-            &rb,
             0x11223344U,
-            10U,
-            10U,
+            test_token_count,
+            test_token_count,
             &certified_state,
             bank_tokens);
 
@@ -132,11 +127,22 @@ int main()
             &ps,
             2U,
             &ra,
-            &rb,
-            &bank_public_key);
+            &bank_public_key,
+            &bank_private_key);
 
-    if (ps_setup_result != RET_OK)
-    {
+    if (memcmp(&ps.bank_public_key, &bank_public_key, sizeof(ps.bank_public_key)) != 0) {
+        printf("Bank public key was not copied correctly.\n");
+        return 1;
+    }
+
+    if (memcmp(&ps.bank_private_key, &bank_private_key, sizeof(ps.bank_private_key)) != 0) {
+        printf("Bank private key was not copied correctly.\n");
+        return 1;
+    }
+
+    printf("Bank private key first byte: 0x%02" PRIX8 "\n", ps.bank_private_key.bytes[0]);
+
+    if (ps_setup_result != RET_OK) {
         printf("Payment System setup failed.\n");
         return 1;
     }
@@ -147,7 +153,6 @@ int main()
     if ((ps.id != 2U) ||
         (ps.ps_state != PS_WAIT_SPEND_REQUEST) ||
         (ps.ra.bytes[0] != 0xAAU) ||
-        (ps.rb.bytes[0] != 0xBBU) ||
         (ps.bank_public_key.bytes[0] != 0xFAU) ||
         (ps.unicast_tsmt_len != 0U) ||
         (ps.unicast_is_present != 0U))
@@ -169,10 +174,6 @@ int main()
     printf(
         "RA first byte: 0x%02" PRIX8 "\n",
         ps.ra.bytes[0]);
-
-    printf(
-        "RB first byte: 0x%02" PRIX8 "\n",
-        ps.rb.bytes[0]);
 
     printf(
         "Bank public key first byte: 0x%02" PRIX8 "\n",
@@ -324,6 +325,66 @@ int main()
     }
 
 
+    printf(
+    "\n---------------------- SYMMETRIC CRYPTO TEST ----------------------\n");
+
+    puftoken_key_t symmetric_test_key = {};
+
+    for (uint32_t i = 0U; i < KEY_SIZE; ++i) {
+        symmetric_test_key.bytes[i] = (uint8_t)(0x10U + i);
+    }
+
+    puftoken_block_t plaintext = {};
+    puftoken_block_t ciphertext = {};
+    puftoken_block_t recovered_plaintext = {};
+
+    for (uint32_t i = 0U; i < BLOCK_SIZE; ++i) {
+        plaintext.bytes[i] = (uint8_t)i;
+    }
+
+    puftoken_ret_t symmetric_result =
+    puftoken_symmetric_encrypt(
+        &symmetric_test_key,
+        &plaintext,
+        &ciphertext);
+
+    if (symmetric_result != RET_OK) {
+        printf("Symmetric encryption failed.\n");
+        return 1;
+    }
+
+    if (memcmp(&plaintext, &ciphertext, sizeof(plaintext)) == 0) {
+        printf("Symmetric encryption did not modify the plaintext.\n");
+        return 1;
+    }
+
+    printf("Symmetric encryption completed correctly.\n");
+
+    symmetric_result =
+        puftoken_symmetric_decrypt(
+            &symmetric_test_key,
+            &ciphertext,
+            &recovered_plaintext);
+
+    if (symmetric_result != RET_OK) {
+        printf("Symmetric decryption failed.\n");
+        return 1;
+    }
+
+    if (memcmp(&plaintext, &recovered_plaintext, sizeof(plaintext)) != 0) {
+        printf("Recovered plaintext does not match the original plaintext.\n");
+        return 1;
+    }
+
+    printf("Symmetric decryption completed correctly.\n");
+    printf("Recovered plaintext matches the original plaintext.\n");
+
+    if (puftoken_symmetric_encrypt(NULL, &plaintext, &ciphertext) != RET_INVALID_ARGUMENT){
+        printf("Symmetric invalid-argument test failed.\n");
+        return 1;
+    }
+
+    printf("Symmetric invalid-argument test completed correctly.\n");
 
     printf("\n---------------------- PUF CHAIN TEST ----------------------\n");
 
@@ -441,11 +502,17 @@ int main()
     }
 
     if ((setup_ps.id != 2U) ||
-        (setup_ps.ps_state != PS_WAIT_SPEND_REQUEST))
-    {
+        (setup_ps.ps_state != PS_WAIT_SPEND_REQUEST)) {
         printf("Complete Payment System setup test failed.\n");
         return 1;
     }
+
+    if (setup_ps.bank_private_key.bytes[0] != 0xA0U) {
+        printf("Bank private key was not installed in the Payment System.\n");
+        return 1;
+    }
+
+    printf("Payment System Bank private key first byte: 0x%02" PRIX8 "\n", setup_ps.bank_private_key.bytes[0]);
 
     if (memcmp(
         &setup_dev.ra,
@@ -453,15 +520,6 @@ int main()
         sizeof(setup_dev.ra)) != 0)
     {
         printf("RA mismatch after complete setup.\n");
-        return 1;
-    }
-
-    if (memcmp(
-            &setup_dev.rb,
-            &setup_ps.rb,
-            sizeof(setup_dev.rb)) != 0)
-    {
-        printf("RB mismatch after complete setup.\n");
         return 1;
     }
 
@@ -515,5 +573,8 @@ int main()
 
     printf("First setup token verified correctly.\n");
     
+    puftoken_dev_cleanup(&dev);
+    puftoken_dev_cleanup(&setup_dev);
+
     return 0;
 }
