@@ -25,8 +25,8 @@ int main()
     puftoken_bank_signature_t bank_tokens[10] = {};
 
     /*
-    * Assign recognizable test values.
-    */
+     * Assign recognizable test values.
+     */
     ra.bytes[0] = 0xAAU;
 
     certified_state.bytes[0] = 0xCCU;
@@ -84,9 +84,6 @@ int main()
         "First Bank token first byte: 0x%02" PRIX8 "\n",
         dev.bank_tokens[0].bytes[0]);
 
-
-
-        
     printf("\n---------------------- PAYMENT SYSTEM TEST ----------------------\n");
 
     PaymentSystem ps = {};
@@ -120,7 +117,7 @@ int main()
 
     printf(
         "Bank public key first byte:  0x%02" PRIX8 "\n",
-    bank_public_key.bytes[0]);
+        bank_public_key.bytes[0]);
 
     const puftoken_ret_t ps_setup_result =
         puftoken_ps_setup(
@@ -130,26 +127,29 @@ int main()
             &bank_public_key,
             &bank_private_key);
 
-    if (memcmp(&ps.bank_public_key, &bank_public_key, sizeof(ps.bank_public_key)) != 0) {
+    if (memcmp(&ps.bank_public_key, &bank_public_key, sizeof(ps.bank_public_key)) != 0)
+    {
         printf("Bank public key was not copied correctly.\n");
         return 1;
     }
 
-    if (memcmp(&ps.bank_private_key, &bank_private_key, sizeof(ps.bank_private_key)) != 0) {
+    if (memcmp(&ps.bank_private_key, &bank_private_key, sizeof(ps.bank_private_key)) != 0)
+    {
         printf("Bank private key was not copied correctly.\n");
         return 1;
     }
 
     printf("Bank private key first byte: 0x%02" PRIX8 "\n", ps.bank_private_key.bytes[0]);
 
-    if (ps_setup_result != RET_OK) {
+    if (ps_setup_result != RET_OK)
+    {
         printf("Payment System setup failed.\n");
         return 1;
     }
 
     /*
-    * Verify the most important initialized fields.
-    */
+     * Verify the most important initialized fields.
+     */
     if ((ps.id != 2U) ||
         (ps.ps_state != PS_WAIT_SPEND_REQUEST) ||
         (ps.ra.bytes[0] != 0xAAU) ||
@@ -179,14 +179,11 @@ int main()
         "Bank public key first byte: 0x%02" PRIX8 "\n",
         ps.bank_public_key.bytes[0]);
 
-
-
-
     printf("\n---------------------- CRYPTO TEST ----------------------\n");
 
     /*
-    * Build the serialized representation of: Q || RL
-    */
+     * Build the serialized representation of: Q || RL
+     */
     uint8_t state_plaintext[STATE_PLAINTEXT_SIZE] = {0U};
 
     const puf_link_t test_q = 0x11223344U;
@@ -200,10 +197,9 @@ int main()
         test_rl,
         &state_plaintext[sizeof(puf_link_t)]);
 
-
     /*
-    * Sign the state using the Bank private key.
-    */
+     * Sign the state using the Bank private key.
+     */
     puftoken_bank_signature_t state_signature = {};
 
     const puftoken_ret_t sign_result =
@@ -263,7 +259,6 @@ int main()
 
     printf("Valid Bank signature accepted correctly.\n");
 
-
     uint8_t modified_state[STATE_PLAINTEXT_SIZE] = {0U};
 
     memcpy(
@@ -272,8 +267,8 @@ int main()
         STATE_PLAINTEXT_SIZE);
 
     /*
-    * Alter one byte of Q.
-    */
+     * Alter one byte of Q.
+     */
     modified_state[0] ^= 0x01U;
 
     const puftoken_ret_t modified_data_result =
@@ -292,11 +287,11 @@ int main()
     printf("Modified data rejected correctly.\n");
 
     puftoken_bank_signature_t modified_signature =
-    state_signature;
+        state_signature;
 
     /*
-    * Alter one byte of the signature.
-    */
+     * Alter one byte of the signature.
+     */
     modified_signature.bytes[0] ^= 0x01U;
 
     const puftoken_ret_t modified_signature_result =
@@ -324,13 +319,13 @@ int main()
         return 1;
     }
 
-
     printf(
-    "\n---------------------- SYMMETRIC CRYPTO TEST ----------------------\n");
+        "\n---------------------- SYMMETRIC CRYPTO TEST ----------------------\n");
 
     puftoken_key_t symmetric_test_key = {};
 
-    for (uint32_t i = 0U; i < KEY_SIZE; ++i) {
+    for (uint32_t i = 0U; i < KEY_SIZE; ++i)
+    {
         symmetric_test_key.bytes[i] = (uint8_t)(0x10U + i);
     }
 
@@ -338,22 +333,25 @@ int main()
     puftoken_block_t ciphertext = {};
     puftoken_block_t recovered_plaintext = {};
 
-    for (uint32_t i = 0U; i < BLOCK_SIZE; ++i) {
+    for (uint32_t i = 0U; i < BLOCK_SIZE; ++i)
+    {
         plaintext.bytes[i] = (uint8_t)i;
     }
 
     puftoken_ret_t symmetric_result =
-    puftoken_symmetric_encrypt(
-        &symmetric_test_key,
-        &plaintext,
-        &ciphertext);
+        puftoken_symmetric_encrypt(
+            &symmetric_test_key,
+            &plaintext,
+            &ciphertext);
 
-    if (symmetric_result != RET_OK) {
+    if (symmetric_result != RET_OK)
+    {
         printf("Symmetric encryption failed.\n");
         return 1;
     }
 
-    if (memcmp(&plaintext, &ciphertext, sizeof(plaintext)) == 0) {
+    if (memcmp(&plaintext, &ciphertext, sizeof(plaintext)) == 0)
+    {
         printf("Symmetric encryption did not modify the plaintext.\n");
         return 1;
     }
@@ -366,12 +364,14 @@ int main()
             &ciphertext,
             &recovered_plaintext);
 
-    if (symmetric_result != RET_OK) {
+    if (symmetric_result != RET_OK)
+    {
         printf("Symmetric decryption failed.\n");
         return 1;
     }
 
-    if (memcmp(&plaintext, &recovered_plaintext, sizeof(plaintext)) != 0) {
+    if (memcmp(&plaintext, &recovered_plaintext, sizeof(plaintext)) != 0)
+    {
         printf("Recovered plaintext does not match the original plaintext.\n");
         return 1;
     }
@@ -379,7 +379,8 @@ int main()
     printf("Symmetric decryption completed correctly.\n");
     printf("Recovered plaintext matches the original plaintext.\n");
 
-    if (puftoken_symmetric_encrypt(NULL, &plaintext, &ciphertext) != RET_INVALID_ARGUMENT){
+    if (puftoken_symmetric_encrypt(NULL, &plaintext, &ciphertext) != RET_INVALID_ARGUMENT)
+    {
         printf("Symmetric invalid-argument test failed.\n");
         return 1;
     }
@@ -437,8 +438,8 @@ int main()
         third_link);
 
     /*
-    * Verify the expected chain values.
-    */
+     * Verify the expected chain values.
+     */
     if ((first_link != 0x96C3F069U) ||
         (second_link != 0x1EE1B51EU) ||
         (third_link != 0x86877A87U))
@@ -450,8 +451,8 @@ int main()
     printf("Simulated PUF expected-values test passed.\n");
 
     /*
-    * Verify that a NULL output pointer is rejected.
-    */
+     * Verify that a NULL output pointer is rejected.
+     */
     if (next_puf_link(
             initial_link,
             NULL) != RET_INVALID_ARGUMENT)
@@ -461,8 +462,6 @@ int main()
     }
 
     printf("NULL next-link test passed.\n");
-
-
 
     printf("\n---------------------- SETUP TEST ----------------------\n");
 
@@ -502,12 +501,14 @@ int main()
     }
 
     if ((setup_ps.id != 2U) ||
-        (setup_ps.ps_state != PS_WAIT_SPEND_REQUEST)) {
+        (setup_ps.ps_state != PS_WAIT_SPEND_REQUEST))
+    {
         printf("Complete Payment System setup test failed.\n");
         return 1;
     }
 
-    if (setup_ps.bank_private_key.bytes[0] != 0xA0U) {
+    if (setup_ps.bank_private_key.bytes[0] != 0xA0U)
+    {
         printf("Bank private key was not installed in the Payment System.\n");
         return 1;
     }
@@ -515,9 +516,9 @@ int main()
     printf("Payment System Bank private key first byte: 0x%02" PRIX8 "\n", setup_ps.bank_private_key.bytes[0]);
 
     if (memcmp(
-        &setup_dev.ra,
-        &setup_ps.ra,
-        sizeof(setup_dev.ra)) != 0)
+            &setup_dev.ra,
+            &setup_ps.ra,
+            sizeof(setup_dev.ra)) != 0)
     {
         printf("RA mismatch after complete setup.\n");
         return 1;
@@ -534,10 +535,10 @@ int main()
         &setup_state[sizeof(puf_link_t)]);
 
     if (puftoken_bank_verify(
-        &setup_ps.bank_public_key,
-        setup_state,
-        STATE_PLAINTEXT_SIZE,
-        &setup_dev.certified_state) != RET_OK)
+            &setup_ps.bank_public_key,
+            setup_state,
+            STATE_PLAINTEXT_SIZE,
+            &setup_dev.certified_state) != RET_OK)
     {
         printf("Initial certified-state verification failed.\n");
         return 1;
@@ -562,19 +563,19 @@ int main()
         first_setup_link_data);
 
     if (puftoken_bank_verify(
-        &setup_ps.bank_public_key,
-        first_setup_link_data,
-        sizeof(first_setup_link_data),
-        &setup_dev.bank_tokens[0]) != RET_OK)
+            &setup_ps.bank_public_key,
+            first_setup_link_data,
+            sizeof(first_setup_link_data),
+            &setup_dev.bank_tokens[0]) != RET_OK)
     {
         printf("First setup token verification failed.\n");
         return 1;
     }
 
     printf("First setup token verified correctly.\n");
-    
+
     printf(
-    "\n---------------------- SPEND REQUEST TEST ----------------------\n");
+        "\n---------------------- SPEND REQUEST TEST ----------------------\n");
 
     const token_count_t spend_test_ats = 3U;
 
@@ -583,7 +584,8 @@ int main()
             &setup_dev,
             spend_test_ats);
 
-    if (spend_request_result != RET_OK) {
+    if (spend_request_result != RET_OK)
+    {
         printf("SPEND_REQUEST generation failed.\n");
         return 1;
     }
@@ -591,20 +593,23 @@ int main()
     if ((setup_dev.dev_state != DEV_WAIT_SPEND_AUTH) ||
         (setup_dev.ats != spend_test_ats) ||
         (setup_dev.unicast_is_present != 1U) ||
-        (setup_dev.unicast_tsmt_len != SPEND_REQUEST_SIZE)) {
+        (setup_dev.unicast_tsmt_len != SPEND_REQUEST_SIZE))
+    {
 
         printf("Device state after SPEND_REQUEST is invalid.\n");
         return 1;
     }
 
-    if ((setup_dev.q != setup_initial_q) || (setup_dev.rl != setup_token_count)) {
+    if ((setup_dev.q != setup_initial_q) || (setup_dev.rl != setup_token_count))
+    {
         printf("Q or RL changed while constructing SPEND_REQUEST.\n");
         return 1;
     }
 
     size_t request_offset = 0U;
 
-    if (setup_dev.unicast_tsmt_buff[request_offset] != (uint8_t)SPEND_REQUEST) {
+    if (setup_dev.unicast_tsmt_buff[request_offset] != (uint8_t)SPEND_REQUEST)
+    {
         printf("Invalid SPEND_REQUEST message type.\n");
         return 1;
     }
@@ -613,7 +618,8 @@ int main()
 
     const puftoken_id_t request_dev_id = U8_TO_ID_BE(&setup_dev.unicast_tsmt_buff[request_offset]);
 
-    if (request_dev_id != setup_dev.id) {
+    if (request_dev_id != setup_dev.id)
+    {
         printf("Invalid Device ID in SPEND_REQUEST.\n");
         return 1;
     }
@@ -631,22 +637,24 @@ int main()
     request_offset += BLOCK_SIZE;
 
     if (puftoken_symmetric_decrypt(
-        &setup_dev.ra,
-        &request_encrypted_state,
-        &request_plaintext) != RET_OK) {
+            &setup_dev.ra,
+            &request_encrypted_state,
+            &request_plaintext) != RET_OK)
+    {
         printf("SPEND_REQUEST state decryption failed.\n");
         return 1;
     }
 
     const puf_link_t request_q =
-    U8_TO_PUF_LINK_BE(
-        request_plaintext.bytes);
+        U8_TO_PUF_LINK_BE(
+            request_plaintext.bytes);
 
     const token_count_t request_rl =
         U8_TO_TOKEN_COUNT_BE(
             &request_plaintext.bytes[sizeof(puf_link_t)]);
 
-    if ((request_q != setup_initial_q) || (request_rl != setup_token_count)) {
+    if ((request_q != setup_initial_q) || (request_rl != setup_token_count))
+    {
         printf("Invalid Q or RL inside SPEND_REQUEST.\n");
         return 1;
     }
@@ -661,9 +669,10 @@ int main()
     request_offset += BANK_SIGNATURE_SIZE;
 
     if (memcmp(
-        &request_certified_state,
-        &setup_dev.certified_state,
-        sizeof(request_certified_state)) != 0) {
+            &request_certified_state,
+            &setup_dev.certified_state,
+            sizeof(request_certified_state)) != 0)
+    {
         printf("Certified state mismatch in SPEND_REQUEST.\n");
         return 1;
     }
@@ -672,28 +681,230 @@ int main()
             &setup_ps.bank_public_key,
             request_plaintext.bytes,
             STATE_PLAINTEXT_SIZE,
-            &request_certified_state) != RET_OK) {
+            &request_certified_state) != RET_OK)
+    {
         printf("SPEND_REQUEST certified state verification failed.\n");
         return 1;
     }
 
     const token_count_t request_ats =
-    U8_TO_TOKEN_COUNT_BE(
-        &setup_dev.unicast_tsmt_buff[request_offset]);
+        U8_TO_TOKEN_COUNT_BE(
+            &setup_dev.unicast_tsmt_buff[request_offset]);
 
     request_offset += TOKEN_COUNT_SIZE;
 
-    if (request_ats != spend_test_ats) {
+    if (request_ats != spend_test_ats)
+    {
         printf("Invalid ATS in SPEND_REQUEST.\n");
         return 1;
     }
 
-    if (request_offset != SPEND_REQUEST_SIZE) {
+    if (request_offset != SPEND_REQUEST_SIZE)
+    {
         printf("Invalid SPEND_REQUEST size.\n");
         return 1;
     }
 
     printf("SPEND_REQUEST generated and verified correctly.\n");
+
+    printf(
+        "\n---------------------- SPEND AUTH TEST ----------------------\n");
+
+    const puf_link_t expected_ps_q = setup_dev.q;
+    const token_count_t expected_ps_rl = setup_dev.rl;
+    const token_count_t expected_ps_ats = setup_dev.ats;
+    const token_count_t expected_ps_nrl = (token_count_t)(expected_ps_rl - expected_ps_ats);
+
+    const puftoken_ret_t spend_auth_result = puftoken_ps_spend_request_cb(&setup_ps, setup_dev.unicast_tsmt_buff, setup_dev.unicast_tsmt_len);
+
+    if (spend_auth_result != RET_OK)
+    {
+        printf("SPEND_REQUEST processing failed.\n");
+        return 1;
+    }
+
+    if ((setup_ps.ps_state != PS_WAIT_TOKEN_BATCH) ||
+        (setup_ps.dev_id != setup_dev.id) ||
+        (setup_ps.q != expected_ps_q) ||
+        (setup_ps.rl != expected_ps_rl) ||
+        (setup_ps.ats != expected_ps_ats) ||
+        (setup_ps.nrl != expected_ps_nrl))
+    {
+        printf("Payment System transaction context is invalid.\n");
+        return 1;
+    }
+
+    if ((setup_ps.unicast_is_present != 1U) ||
+        (setup_ps.unicast_tsmt_len != SPEND_AUTH_RESULT_OK_SIZE))
+    {
+        printf("Invalid SPEND_AUTH_RESULT buffer state.\n");
+        return 1;
+    }
+
+    size_t auth_offset = 0U;
+
+    if (setup_ps.unicast_tsmt_buff[auth_offset] !=
+        (uint8_t)SPEND_AUTH_RESULT)
+    {
+        printf("Invalid SPEND_AUTH_RESULT message type.\n");
+        return 1;
+    }
+
+    auth_offset += MESSAGE_TYPE_SIZE;
+
+    const puftoken_id_t auth_ps_id =
+        U8_TO_ID_BE(
+            &setup_ps.unicast_tsmt_buff[auth_offset]);
+
+    auth_offset += ID_SIZE;
+
+    if (auth_ps_id != setup_ps.id)
+    {
+        printf("Invalid Payment System ID in SPEND_AUTH_RESULT.\n");
+        return 1;
+    }
+
+    const puftoken_status_t auth_status =
+        (puftoken_status_t)
+            setup_ps.unicast_tsmt_buff[auth_offset];
+
+    auth_offset += STATUS_SIZE;
+
+    if (auth_status != STATUS_OK)
+    {
+        printf("SPEND_AUTH_RESULT did not contain STATUS_OK.\n");
+        return 1;
+    }
+
+    const token_count_t auth_nrl =
+        U8_TO_TOKEN_COUNT_BE(
+            &setup_ps.unicast_tsmt_buff[auth_offset]);
+
+    auth_offset += TOKEN_COUNT_SIZE;
+
+    if (auth_nrl != expected_ps_nrl)
+    {
+        printf("Invalid NRL in SPEND_AUTH_RESULT.\n");
+        return 1;
+    }
+
+    if (auth_offset != SPEND_AUTH_RESULT_OK_SIZE)
+    {
+        printf("Invalid SPEND_AUTH_RESULT size.\n");
+        return 1;
+    }
+
+    printf(
+        "SPEND_REQUEST accepted correctly. NRL = %" PRIu16 "\n",
+        auth_nrl);
+
+    PaymentSystem integrity_test_ps = {};
+
+    if (puftoken_ps_setup(
+            &integrity_test_ps,
+            setup_ps.id,
+            &setup_ps.ra,
+            &setup_ps.bank_public_key,
+            &setup_ps.bank_private_key) != RET_OK)
+    {
+        printf("Integrity-test Payment System setup failed.\n");
+        return 1;
+    }
+
+    uint8_t tampered_request[SPEND_REQUEST_SIZE] = {};
+
+    memcpy(
+        tampered_request,
+        setup_dev.unicast_tsmt_buff,
+        SPEND_REQUEST_SIZE);
+
+    const size_t request_signature_offset =
+        MESSAGE_TYPE_SIZE +
+        ID_SIZE +
+        BLOCK_SIZE;
+
+    tampered_request[request_signature_offset] ^= 0x01U;
+
+    if (puftoken_ps_spend_request_cb(
+            &integrity_test_ps,
+            tampered_request,
+            SPEND_REQUEST_SIZE) != RET_OK)
+    {
+        printf("Integrity-failure request processing failed.\n");
+        return 1;
+    }
+
+    if ((integrity_test_ps.ps_state != PS_WAIT_SPEND_REQUEST) ||
+        (integrity_test_ps.unicast_is_present != 1U) ||
+        (integrity_test_ps.unicast_tsmt_len !=
+         SPEND_AUTH_RESULT_BASE_SIZE))
+    {
+        printf("INTEGRITY_FAIL response state is invalid.\n");
+        return 1;
+    }
+
+    const size_t auth_status_offset =
+        MESSAGE_TYPE_SIZE + ID_SIZE;
+
+    if (integrity_test_ps.unicast_tsmt_buff[auth_status_offset] !=
+        (uint8_t)STATUS_INTEGRITY_FAIL)
+    {
+        printf("Expected STATUS_INTEGRITY_FAIL.\n");
+        return 1;
+    }
+
+    printf("Modified certified state rejected correctly.\n");
+
+    PaymentSystem amount_test_ps = {};
+
+    if (puftoken_ps_setup(
+            &amount_test_ps,
+            setup_ps.id,
+            &setup_ps.ra,
+            &setup_ps.bank_public_key,
+            &setup_ps.bank_private_key) != RET_OK)
+    {
+        printf("Amount-test Payment System setup failed.\n");
+        return 1;
+    }
+
+    uint8_t invalid_amount_request[SPEND_REQUEST_SIZE] = {};
+
+    memcpy(
+        invalid_amount_request,
+        setup_dev.unicast_tsmt_buff,
+        SPEND_REQUEST_SIZE);
+
+    const size_t request_ats_offset =
+        SPEND_REQUEST_SIZE - TOKEN_COUNT_SIZE;
+
+    const token_count_t invalid_ats =
+        (token_count_t)(expected_ps_rl + 1U);
+
+    TOKEN_COUNT_TO_U8_BE(
+        invalid_ats,
+        &invalid_amount_request[request_ats_offset]);
+
+    if (puftoken_ps_spend_request_cb(
+            &amount_test_ps,
+            invalid_amount_request,
+            SPEND_REQUEST_SIZE) != RET_OK)
+    {
+        printf("Invalid-amount request processing failed.\n");
+        return 1;
+    }
+
+    if ((amount_test_ps.ps_state != PS_WAIT_SPEND_REQUEST) ||
+        (amount_test_ps.unicast_tsmt_len !=
+         SPEND_AUTH_RESULT_BASE_SIZE) ||
+        (amount_test_ps.unicast_tsmt_buff[auth_status_offset] !=
+         (uint8_t)STATUS_INVALID_AMOUNT))
+    {
+        printf("Expected STATUS_INVALID_AMOUNT.\n");
+        return 1;
+    }
+
+    printf("Invalid amount rejected correctly.\n");
 
     puftoken_dev_cleanup(&dev);
     puftoken_dev_cleanup(&setup_dev);
