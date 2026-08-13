@@ -13,8 +13,8 @@ typedef enum
 {
     DEV_READY,              /* The Device is not executing a transaction and can start a new spending operation */
     DEV_WAIT_SPEND_AUTH,    /* The Device has sent SPEND_REQUEST and is waiting for SPEND_AUTH_RESULT from the Payment System */
-    DEV_WAIT_SPEND_RESULT   /* The Device has sent TOKEN_BATCH and is waiting for the final SPEND_RESULT from the Payment System */
-
+    DEV_WAIT_SPEND_RESULT,  /* The Device has sent TOKEN_BATCH and is waiting for the final SPEND_RESULT from the Payment System */
+    DEV_NEEDS_REISSUE
 } PUFToken_Dev_State;
 
 

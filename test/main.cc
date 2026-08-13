@@ -1209,6 +1209,651 @@ int main()
     printf(
         "TOKEN_BATCH accepted and new state certified correctly.\n");
 
+    printf(
+        "\n---------------------- FINAL DEVICE TEST ----------------------\n");
+
+    /*
+     * Save the values that the Device must commit after receiving
+     * STATUS_ACCEPT.
+     *
+     * Q has already been advanced while TOKEN_BATCH was generated.
+     * NRL is still waiting to be committed as the new RL.
+     */
+    const puf_link_t final_expected_q =
+        setup_dev.q;
+
+    const token_count_t final_expected_rl =
+        setup_dev.nrl;
+
+    /*
+     * Save the new certified state contained in SPEND_RESULT before
+     * giving the packet to the Device.
+     */
+    puftoken_bank_signature_t expected_final_certified_state = {};
+
+    memcpy(
+        expected_final_certified_state.bytes,
+        &setup_ps.unicast_tsmt_buff[SPEND_RESULT_BASE_SIZE],
+        BANK_SIGNATURE_SIZE);
+
+    /*
+     * Deliver SPEND_RESULT to the Device.
+     */
+    const puftoken_ret_t device_final_result =
+        puftoken_dev_spend_result_cb(
+            &setup_dev,
+            setup_ps.unicast_tsmt_buff,
+            setup_ps.unicast_tsmt_len);
+
+    if (device_final_result != RET_OK)
+    {
+        printf("SPEND_RESULT processing failed.\n");
+        return 1;
+    }
+
+    /*
+     * The Device must return to the READY state.
+     */
+    if (setup_dev.dev_state != DEV_READY)
+    {
+        printf("Device did not return to DEV_READY.\n");
+        return 1;
+    }
+
+    /*
+     * Q must not change here because it was already advanced
+     * while TOKEN_BATCH was generated.
+     */
+    if (setup_dev.q != final_expected_q)
+    {
+        printf("Q changed while processing final ACCEPT.\n");
+        return 1;
+    }
+
+    /*
+     * NRL must now become the new RL.
+     */
+    if (setup_dev.rl != final_expected_rl)
+    {
+        printf("RL was not updated to NRL.\n");
+        return 1;
+    }
+
+    /*
+     * The Device must store n_new as its new certified state.
+     */
+    if (memcmp(
+            &setup_dev.certified_state,
+            &expected_final_certified_state,
+            sizeof(setup_dev.certified_state)) != 0)
+    {
+        printf("New certified state was not stored correctly.\n");
+        return 1;
+    }
+
+    /*
+     * Verify, as part of the test, that the stored certified state
+     * is really a valid Bank signature for:
+     *
+     * Q_new || RL_new
+     *
+     * This verification is performed by the test code, not by
+     * puftoken_dev_spend_result_cb().
+     */
+    uint8_t final_state_plaintext[STATE_PLAINTEXT_SIZE] = {0U};
+
+    PUF_LINK_TO_U8_BE(
+        setup_dev.q,
+        final_state_plaintext);
+
+    TOKEN_COUNT_TO_U8_BE(
+        setup_dev.rl,
+        &final_state_plaintext[sizeof(puf_link_t)]);
+
+    if (puftoken_bank_verify(
+            &setup_ps.bank_public_key,
+            final_state_plaintext,
+            STATE_PLAINTEXT_SIZE,
+            &setup_dev.certified_state) != RET_OK)
+    {
+        printf("Stored final certified state is invalid.\n");
+        return 1;
+    }
+
+    /*
+     * The temporary transaction context must have been cleared.
+     */
+    if ((setup_dev.ats != 0U) ||
+        (setup_dev.nrl != 0U) ||
+        (setup_dev.unicast_tsmt_len != 0U) ||
+        (setup_dev.unicast_is_present != 0U))
+    {
+        printf("Device transaction context was not cleared.\n");
+        return 1;
+    }
+
+    printf(
+        "Payment completed and Device state updated correctly.\n");
+
+    printf(
+        "Final RL: %" PRIu16 "\n",
+        setup_dev.rl);
+
+    /*
+     * ------------------------------------------------------------
+     * Test the STATUS_INVALID_TOKEN branch.
+     *
+     * We use a copy of the Device so that the successfully completed
+     * transaction above is not modified.
+     * ------------------------------------------------------------
+     */
+    printf(
+        "\n---------------------- INVALID FINAL RESULT TEST ----------------------\n");
+
+    Device invalid_result_dev = setup_dev;
+
+    /*
+     * Simulate the situation immediately before the final response:
+     * Q has already advanced and the Device is waiting for
+     * SPEND_RESULT.
+     */
+    invalid_result_dev.dev_state =
+        DEV_WAIT_SPEND_RESULT;
+
+    invalid_result_dev.ats = 1U;
+    invalid_result_dev.nrl =
+        (token_count_t)(invalid_result_dev.rl - 1U);
+
+    /*
+     * Build:
+     *
+     * TYPE | PS_ID | STATUS_INVALID_TOKEN
+     */
+    uint8_t invalid_spend_result[SPEND_RESULT_BASE_SIZE] = {0U};
+
+    size_t invalid_result_offset = 0U;
+
+    invalid_spend_result[invalid_result_offset] =
+        (uint8_t)SPEND_RESULT;
+
+    invalid_result_offset += MESSAGE_TYPE_SIZE;
+
+    ID_TO_U8_BE(
+        invalid_result_dev.ps_id,
+        &invalid_spend_result[invalid_result_offset]);
+
+    invalid_result_offset += ID_SIZE;
+
+    invalid_spend_result[invalid_result_offset] =
+        (uint8_t)STATUS_INVALID_TOKEN;
+
+    invalid_result_offset += STATUS_SIZE;
+
+    if (invalid_result_offset !=
+        SPEND_RESULT_BASE_SIZE)
+    {
+        printf("Invalid test SPEND_RESULT size.\n");
+        return 1;
+    }
+
+    const puf_link_t q_before_invalid_result =
+        invalid_result_dev.q;
+
+    const token_count_t rl_before_invalid_result =
+        invalid_result_dev.rl;
+
+    /*
+     * Process STATUS_INVALID_TOKEN.
+     */
+    const puftoken_ret_t invalid_final_result =
+        puftoken_dev_spend_result_cb(
+            &invalid_result_dev,
+            invalid_spend_result,
+            SPEND_RESULT_BASE_SIZE);
+
+    if (invalid_final_result != RET_OK)
+    {
+        printf("STATUS_INVALID_TOKEN processing failed.\n");
+        return 1;
+    }
+
+    /*
+     * The Device must require a new issuance.
+     */
+    if (invalid_result_dev.dev_state !=
+        DEV_NEEDS_REISSUE)
+    {
+        printf(
+            "Device did not enter DEV_NEEDS_REISSUE.\n");
+        return 1;
+    }
+
+    /*
+     * No rollback of Q is allowed.
+     */
+    if (invalid_result_dev.q !=
+        q_before_invalid_result)
+    {
+        printf(
+            "Q was rolled back after STATUS_INVALID_TOKEN.\n");
+        return 1;
+    }
+
+    /*
+     * RL must not be committed because the payment failed.
+     */
+    if (invalid_result_dev.rl !=
+        rl_before_invalid_result)
+    {
+        printf(
+            "RL changed after STATUS_INVALID_TOKEN.\n");
+        return 1;
+    }
+
+    /*
+     * The temporary transaction values must be cleared.
+     */
+    if ((invalid_result_dev.ats != 0U) ||
+        (invalid_result_dev.nrl != 0U) ||
+        (invalid_result_dev.unicast_tsmt_len != 0U) ||
+        (invalid_result_dev.unicast_is_present != 0U))
+    {
+        printf(
+            "Invalid-result transaction context was not cleared.\n");
+        return 1;
+    }
+
+    printf(
+        "STATUS_INVALID_TOKEN handled correctly: "
+        "Device requires token reissue.\n");
+
+    printf(
+        "\n---------------------- SECOND PAYMENT TEST ----------------------\n");
+
+    /*
+     * State after the first successful payment:
+     *
+     * iss_tok_count = 10
+     * RL            = 7
+     *
+     * The first Bank token that must be used by the second
+     * payment is therefore:
+     *
+     * iss_tok_count - RL = 3
+     *
+     * i.e. bank_tokens[3].
+     */
+    const token_count_t second_payment_ats = 2U;
+
+    const puf_link_t second_initial_q =
+        setup_dev.q;
+
+    const token_count_t second_initial_rl =
+        setup_dev.rl;
+
+    const token_count_t second_first_token_index =
+        (token_count_t)(setup_dev.iss_tok_count -
+                        setup_dev.rl);
+
+    if (second_first_token_index != 3U)
+    {
+        printf(
+            "Unexpected first token index for second payment.\n");
+        return 1;
+    }
+
+    /*
+     * ------------------------------------------------------------
+     * 1. DEVICE -> SPEND_REQUEST
+     * ------------------------------------------------------------
+     */
+    if (puftoken_dev_start_spending(
+            &setup_dev,
+            second_payment_ats) != RET_OK)
+    {
+        printf(
+            "Second SPEND_REQUEST generation failed.\n");
+        return 1;
+    }
+
+    if ((setup_dev.dev_state != DEV_WAIT_SPEND_AUTH) ||
+        (setup_dev.ats != second_payment_ats))
+    {
+        printf(
+            "Invalid Device state after second SPEND_REQUEST.\n");
+        return 1;
+    }
+
+    /*
+     * Q and RL must not change while SPEND_REQUEST is built.
+     */
+    if ((setup_dev.q != second_initial_q) ||
+        (setup_dev.rl != second_initial_rl))
+    {
+        printf(
+            "Q or RL changed during second SPEND_REQUEST.\n");
+        return 1;
+    }
+
+    /*
+     * ------------------------------------------------------------
+     * 2. PAYMENT SYSTEM -> process SPEND_REQUEST
+     * ------------------------------------------------------------
+     */
+    if (puftoken_ps_spend_request_cb(
+            &setup_ps,
+            setup_dev.unicast_tsmt_buff,
+            setup_dev.unicast_tsmt_len) != RET_OK)
+    {
+        printf(
+            "Second SPEND_REQUEST processing failed.\n");
+        return 1;
+    }
+
+    const token_count_t second_expected_nrl =
+        (token_count_t)(second_initial_rl -
+                        second_payment_ats);
+
+    if ((setup_ps.ps_state != PS_WAIT_TOKEN_BATCH) ||
+        (setup_ps.ats != second_payment_ats) ||
+        (setup_ps.rl != second_initial_rl) ||
+        (setup_ps.nrl != second_expected_nrl))
+    {
+        printf(
+            "Invalid Payment System state during second payment.\n");
+        return 1;
+    }
+
+    /*
+     * ------------------------------------------------------------
+     * 3. DEVICE -> process SPEND_AUTH_RESULT and build TOKEN_BATCH
+     * ------------------------------------------------------------
+     */
+    if (puftoken_dev_spend_auth_cb(
+            &setup_dev,
+            setup_ps.unicast_tsmt_buff,
+            setup_ps.unicast_tsmt_len) != RET_OK)
+    {
+        printf(
+            "Second SPEND_AUTH_RESULT processing failed.\n");
+        return 1;
+    }
+
+    if ((setup_dev.dev_state != DEV_WAIT_SPEND_RESULT) ||
+        (setup_dev.nrl != second_expected_nrl) ||
+        (setup_dev.rl != second_initial_rl))
+    {
+        printf(
+            "Invalid Device state after second TOKEN_BATCH.\n");
+        return 1;
+    }
+
+    /*
+     * ------------------------------------------------------------
+     * Verify the TOKEN_BATCH generated during the second payment.
+     * ------------------------------------------------------------
+     */
+    const token_count_t second_batch_token_count =
+        U8_TO_TOKEN_COUNT_BE(
+            &setup_dev.unicast_tsmt_buff[MESSAGE_TYPE_SIZE + ID_SIZE]);
+
+    if (second_batch_token_count !=
+        second_payment_ats)
+    {
+        printf(
+            "Invalid TOKEN_COUNT in second TOKEN_BATCH.\n");
+        return 1;
+    }
+
+    const size_t second_a_offset =
+        TOKEN_BATCH_BASE_SIZE;
+
+    const size_t second_b_offset =
+        second_a_offset +
+        ((size_t)second_batch_token_count *
+         BLOCK_SIZE);
+
+    puf_link_t second_expected_link =
+        second_initial_q;
+
+    for (token_count_t j = 0U;
+         j < second_batch_token_count;
+         ++j)
+    {
+        /*
+         * Calculate the PUF link that should have been generated.
+         */
+        puf_link_t next_expected_link = 0U;
+
+        if (next_puf_link(
+                second_expected_link,
+                &next_expected_link) != RET_OK)
+        {
+            printf(
+                "Second-payment expected PUF link generation failed.\n");
+            return 1;
+        }
+
+        /*
+         * Recover A[j].
+         */
+        puftoken_block_t second_encrypted_link = {};
+        puftoken_block_t second_decrypted_link = {};
+
+        memcpy(
+            second_encrypted_link.bytes,
+            &setup_dev.unicast_tsmt_buff[second_a_offset +
+                                         ((size_t)j * BLOCK_SIZE)],
+            BLOCK_SIZE);
+
+        if (puftoken_symmetric_decrypt(
+                &setup_dev.ra,
+                &second_encrypted_link,
+                &second_decrypted_link) != RET_OK)
+        {
+            printf(
+                "Second TOKEN_BATCH link decryption failed.\n");
+            return 1;
+        }
+
+        const puf_link_t second_received_link =
+            U8_TO_PUF_LINK_BE(
+                second_decrypted_link.bytes);
+
+        if (second_received_link !=
+            next_expected_link)
+        {
+            printf(
+                "Invalid PUF link in second TOKEN_BATCH.\n");
+            return 1;
+        }
+
+        /*
+         * Recover B[j].
+         */
+        puftoken_bank_signature_t
+            second_received_bank_token = {};
+
+        memcpy(
+            second_received_bank_token.bytes,
+            &setup_dev.unicast_tsmt_buff[second_b_offset +
+                                         ((size_t)j *
+                                          BANK_SIGNATURE_SIZE)],
+            BANK_SIGNATURE_SIZE);
+
+        /*
+         * Verify that B[j] is a valid Bank signature
+         * for the recovered link.
+         */
+        if (puftoken_bank_verify(
+                &setup_ps.bank_public_key,
+                second_decrypted_link.bytes,
+                sizeof(puf_link_t),
+                &second_received_bank_token) != RET_OK)
+        {
+            printf(
+                "Invalid Bank token in second TOKEN_BATCH.\n");
+            return 1;
+        }
+
+        /*
+         * Most importantly, verify that the Device used the
+         * correct Bank token index.
+         *
+         * First payment consumed:
+         * bank_tokens[0], [1], [2]
+         *
+         * Second payment must therefore use:
+         * bank_tokens[3], [4]
+         */
+        const token_count_t expected_bank_token_index =
+            (token_count_t)(second_first_token_index + j);
+
+        if (memcmp(
+                &second_received_bank_token,
+                &setup_dev.bank_tokens[expected_bank_token_index],
+                sizeof(second_received_bank_token)) != 0)
+        {
+            printf(
+                "Wrong Bank token index in second payment.\n");
+            return 1;
+        }
+
+        second_expected_link =
+            next_expected_link;
+    }
+
+    /*
+     * Q must now point to the last generated PUF link.
+     */
+    if (setup_dev.q != second_expected_link)
+    {
+        printf(
+            "Q was not advanced correctly in second payment.\n");
+        return 1;
+    }
+
+    /*
+     * ------------------------------------------------------------
+     * 4. PAYMENT SYSTEM -> verify TOKEN_BATCH and build SPEND_RESULT
+     * ------------------------------------------------------------
+     */
+    if (puftoken_ps_token_batch_cb(
+            &setup_ps,
+            setup_dev.unicast_tsmt_buff,
+            setup_dev.unicast_tsmt_len) != RET_OK)
+    {
+        printf(
+            "Second TOKEN_BATCH processing failed.\n");
+        return 1;
+    }
+
+    const size_t second_result_status_offset =
+        MESSAGE_TYPE_SIZE + ID_SIZE;
+
+    if ((setup_ps.ps_state != PS_WAIT_SPEND_REQUEST) ||
+        (setup_ps.unicast_tsmt_len !=
+         SPEND_RESULT_ACCEPT_SIZE) ||
+        (setup_ps.unicast_tsmt_buff[second_result_status_offset] !=
+         (uint8_t)STATUS_ACCEPT))
+    {
+        printf(
+            "Second payment was not accepted.\n");
+        return 1;
+    }
+
+    /*
+     * ------------------------------------------------------------
+     * 5. DEVICE -> process final SPEND_RESULT
+     * ------------------------------------------------------------
+     */
+    if (puftoken_dev_spend_result_cb(
+            &setup_dev,
+            setup_ps.unicast_tsmt_buff,
+            setup_ps.unicast_tsmt_len) != RET_OK)
+    {
+        printf(
+            "Second SPEND_RESULT processing failed.\n");
+        return 1;
+    }
+
+    /*
+     * ------------------------------------------------------------
+     * Verify the final Device state.
+     * ------------------------------------------------------------
+     */
+    if (setup_dev.dev_state != DEV_READY)
+    {
+        printf(
+            "Device did not return to DEV_READY "
+            "after second payment.\n");
+        return 1;
+    }
+
+    if (setup_dev.rl != second_expected_nrl)
+    {
+        printf(
+            "Invalid final RL after second payment.\n");
+        return 1;
+    }
+
+    if (setup_dev.q != second_expected_link)
+    {
+        printf(
+            "Invalid final Q after second payment.\n");
+        return 1;
+    }
+
+    /*
+     * Verify the new certified state:
+     *
+     * Sign_PRB(Q_new || RL_new)
+     */
+    uint8_t second_final_state[STATE_PLAINTEXT_SIZE] = {0U};
+
+    PUF_LINK_TO_U8_BE(
+        setup_dev.q,
+        second_final_state);
+
+    TOKEN_COUNT_TO_U8_BE(
+        setup_dev.rl,
+        &second_final_state[sizeof(puf_link_t)]);
+
+    if (puftoken_bank_verify(
+            &setup_ps.bank_public_key,
+            second_final_state,
+            STATE_PLAINTEXT_SIZE,
+            &setup_dev.certified_state) != RET_OK)
+    {
+        printf(
+            "Second payment final certified state is invalid.\n");
+        return 1;
+    }
+
+    /*
+     * Temporary transaction state must again be clear.
+     */
+    if ((setup_dev.ats != 0U) ||
+        (setup_dev.nrl != 0U) ||
+        (setup_dev.unicast_tsmt_len != 0U) ||
+        (setup_dev.unicast_is_present != 0U))
+    {
+        printf(
+            "Second-payment transaction context was not cleared.\n");
+        return 1;
+    }
+
+    printf(
+        "Second payment completed correctly.\n");
+
+    printf(
+        "Second payment used Bank tokens starting from index %" PRIu16 ".\n",
+        second_first_token_index);
+
+    printf(
+        "Final RL after two payments: %" PRIu16 "\n",
+        setup_dev.rl);
+
     puftoken_dev_cleanup(&dev);
     puftoken_dev_cleanup(&setup_dev);
 

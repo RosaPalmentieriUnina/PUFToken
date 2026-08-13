@@ -368,6 +368,132 @@ puftoken_ret_t puftoken_dev_spend_auth_cb(
     return RET_OK;
 }
 
+puftoken_ret_t puftoken_dev_spend_result_cb(
+    Device *const dev,
+    const uint8_t *const rcvd_pkt,
+    const uint32_t pkt_len)
+{
+    if ((dev == NULL) || (rcvd_pkt == NULL))
+    {
+        return RET_INVALID_ARGUMENT;
+    }
+
+    if (dev->dev_state != DEV_WAIT_SPEND_RESULT)
+    {
+        return RET_INVALID_STATE;
+    }
+
+    if (pkt_len < SPEND_RESULT_BASE_SIZE)
+    {
+        return RET_INVALID_PACKET;
+    }
+
+    if (rcvd_pkt[0] != (uint8_t)SPEND_RESULT)
+    {
+        return RET_INVALID_PACKET;
+    }
+
+    size_t offset = MESSAGE_TYPE_SIZE;
+
+    const puftoken_id_t received_ps_id =
+        U8_TO_ID_BE(
+            &rcvd_pkt[offset]);
+
+    offset += ID_SIZE;
+
+    if (received_ps_id != dev->ps_id)
+    {
+        return RET_INVALID_PACKET;
+    }
+
+    const puftoken_status_t status =
+        (puftoken_status_t)rcvd_pkt[offset];
+
+    offset += STATUS_SIZE;
+
+    /*
+     * The TOKEN_BATCH was rejected.
+     *
+     * Q has already advanced and is not rolled back.
+     * New tokens based on new PUF links are required
+     * before another payment can be started.
+     */
+    if (status == STATUS_INVALID_TOKEN)
+    {
+        if (pkt_len != SPEND_RESULT_BASE_SIZE)
+        {
+            return RET_INVALID_PACKET;
+        }
+
+        dev->ats = 0U;
+        dev->nrl = 0U;
+
+        dev->unicast_tsmt_len = 0U;
+        dev->unicast_is_present = 0U;
+
+        dev->dev_state =
+            DEV_NEEDS_REISSUE;
+
+        return RET_OK;
+    }
+
+    if (status != STATUS_ACCEPT)
+    {
+        return RET_INVALID_PACKET;
+    }
+
+    if (pkt_len != SPEND_RESULT_ACCEPT_SIZE)
+    {
+        return RET_INVALID_PACKET;
+    }
+
+    puftoken_bank_signature_t new_certified_state = {};
+
+    memcpy(
+        new_certified_state.bytes,
+        &rcvd_pkt[offset],
+        BANK_SIGNATURE_SIZE);
+
+    offset += BANK_SIGNATURE_SIZE;
+
+    if (offset != pkt_len)
+    {
+        return RET_INVALID_PACKET;
+    }
+
+    if (dev->nrl > dev->rl)
+    {
+        return RET_INVALID_STATE;
+    }
+
+    /*
+     * Commit the new state.
+     *
+     * Q has already been updated while TOKEN_BATCH was built.
+     */
+    dev->rl =
+        dev->nrl;
+
+    memcpy(
+        &dev->certified_state,
+        &new_certified_state,
+        sizeof(dev->certified_state));
+
+    /*
+     * Clear the completed transaction context.
+     */
+    dev->ats = 0U;
+    dev->nrl = 0U;
+
+    dev->unicast_tsmt_len = 0U;
+    dev->unicast_is_present = 0U;
+
+    dev->dev_state =
+        DEV_READY;
+
+    return RET_OK;
+}
+
 void puftoken_dev_cleanup(Device *const dev)
 {
     if (dev == NULL)
