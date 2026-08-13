@@ -906,6 +906,158 @@ int main()
 
     printf("Invalid amount rejected correctly.\n");
 
+    printf(
+        "\n---------------------- TOKEN BATCH TEST ----------------------\n");
+
+    const puf_link_t q_before_token_batch = setup_dev.q;
+    const token_count_t rl_before_token_batch = setup_dev.rl;
+    const token_count_t ats_before_token_batch = setup_dev.ats;
+
+    const puftoken_ret_t token_batch_result =
+        puftoken_dev_spend_auth_cb(
+            &setup_dev,
+            setup_ps.unicast_tsmt_buff,
+            setup_ps.unicast_tsmt_len);
+
+    if (token_batch_result != RET_OK)
+    {
+        printf("SPEND_AUTH_RESULT processing failed.\n");
+        return 1;
+    }
+
+    if ((setup_dev.dev_state != DEV_WAIT_SPEND_RESULT) ||
+        (setup_dev.nrl != setup_ps.nrl) ||
+        (setup_dev.rl != rl_before_token_batch) ||
+        (setup_dev.unicast_is_present != 1U) ||
+        (setup_dev.unicast_tsmt_len !=
+         TOKEN_BATCH_SIZE(ats_before_token_batch)))
+    {
+        printf("Device state after TOKEN_BATCH generation is invalid.\n");
+        return 1;
+    }
+
+    size_t batch_offset = 0U;
+
+    if (setup_dev.unicast_tsmt_buff[batch_offset] !=
+        (uint8_t)TOKEN_BATCH)
+    {
+        printf("Invalid TOKEN_BATCH message type.\n");
+        return 1;
+    }
+
+    batch_offset += MESSAGE_TYPE_SIZE;
+
+    const puftoken_id_t batch_dev_id =
+        U8_TO_ID_BE(
+            &setup_dev.unicast_tsmt_buff[batch_offset]);
+
+    batch_offset += ID_SIZE;
+
+    if (batch_dev_id != setup_dev.id)
+    {
+        printf("Invalid Device ID in TOKEN_BATCH.\n");
+        return 1;
+    }
+
+    const token_count_t batch_token_count =
+        U8_TO_TOKEN_COUNT_BE(
+            &setup_dev.unicast_tsmt_buff[batch_offset]);
+
+    batch_offset += TOKEN_COUNT_SIZE;
+
+    if (batch_token_count != ats_before_token_batch)
+    {
+        printf("Invalid token count in TOKEN_BATCH.\n");
+        return 1;
+    }
+
+    const size_t batch_a_offset =
+        TOKEN_BATCH_BASE_SIZE;
+
+    const size_t batch_b_offset =
+        batch_a_offset +
+        ((size_t)batch_token_count * BLOCK_SIZE);
+
+    puf_link_t expected_link = q_before_token_batch;
+
+    for (token_count_t j = 0U;
+         j < batch_token_count;
+         ++j)
+    {
+        puf_link_t next_expected_link = 0U;
+
+        if (next_puf_link(
+                expected_link,
+                &next_expected_link) != RET_OK)
+        {
+            printf("Expected PUF link generation failed.\n");
+            return 1;
+        }
+
+        puftoken_block_t encrypted_link = {};
+        puftoken_block_t decrypted_link = {};
+
+        memcpy(
+            encrypted_link.bytes,
+            &setup_dev.unicast_tsmt_buff[batch_a_offset +
+                                         ((size_t)j * BLOCK_SIZE)],
+            BLOCK_SIZE);
+
+        if (puftoken_symmetric_decrypt(
+                &setup_dev.ra,
+                &encrypted_link,
+                &decrypted_link) != RET_OK)
+        {
+            printf("TOKEN_BATCH link decryption failed.\n");
+            return 1;
+        }
+
+        const puf_link_t received_link =
+            U8_TO_PUF_LINK_BE(
+                decrypted_link.bytes);
+
+        if (received_link != next_expected_link)
+        {
+            printf("Invalid PUF link in TOKEN_BATCH.\n");
+            return 1;
+        }
+
+        puftoken_bank_signature_t received_bank_token = {};
+
+        memcpy(
+            received_bank_token.bytes,
+            &setup_dev.unicast_tsmt_buff[batch_b_offset +
+                                         ((size_t)j * BANK_SIGNATURE_SIZE)],
+            BANK_SIGNATURE_SIZE);
+
+        if (puftoken_bank_verify(
+                &setup_ps.bank_public_key,
+                decrypted_link.bytes,
+                sizeof(puf_link_t),
+                &received_bank_token) != RET_OK)
+        {
+            printf("Invalid Bank token in TOKEN_BATCH.\n");
+            return 1;
+        }
+
+        expected_link = next_expected_link;
+    }
+    
+    if (setup_dev.q != expected_link)
+    {
+        printf("Q was not advanced correctly.\n");
+        return 1;
+    }
+
+    if (setup_dev.rl != rl_before_token_batch)
+    {
+        printf("RL was updated before final ACCEPT.\n");
+        return 1;
+    }
+
+    printf(
+        "TOKEN_BATCH generated and verified correctly.\n");
+
     puftoken_dev_cleanup(&dev);
     puftoken_dev_cleanup(&setup_dev);
 

@@ -94,7 +94,12 @@ typedef enum {
 #define SPEND_AUTH_RESULT_OK_SIZE (SPEND_AUTH_RESULT_BASE_SIZE + TOKEN_COUNT_SIZE)
 
 /**
- * TYPE | DEVICE_ID | TOKEN_COUNT | (A[j] | B[j])...
+ * TYPE | DEVICE_ID | TOKEN_COUNT |
+ * A[0] | ... | A[TOKEN_COUNT - 1] |
+ * B[0] | ... | B[TOKEN_COUNT - 1]
+ *
+ * A contains the links protected with RA.
+ * B contains the corresponding Bank signatures.
  */
 #define TOKEN_PAIR_SIZE (BLOCK_SIZE + BANK_SIGNATURE_SIZE)
 
