@@ -110,8 +110,14 @@ typedef enum {
 /**
  * TYPE | PS_ID | STATUS
  */
-#define SPEND_RESULT_SIZE (MESSAGE_TYPE_SIZE + ID_SIZE + STATUS_SIZE)
+#define SPEND_RESULT_BASE_SIZE \
+    (MESSAGE_TYPE_SIZE + ID_SIZE + STATUS_SIZE)
 
+/**
+ * TYPE | PS_ID | STATUS_ACCEPT | BANK_SIGNATURE(Q_new || NRL)
+ */
+#define SPEND_RESULT_ACCEPT_SIZE \
+    (SPEND_RESULT_BASE_SIZE + BANK_SIGNATURE_SIZE)
 
 #define U8_TO_ID_BE(buff) (((puftoken_id_t)(*(buff)) << 8) | (puftoken_id_t)(*((buff) + 1)))
 

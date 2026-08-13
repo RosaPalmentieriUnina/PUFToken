@@ -1042,7 +1042,7 @@ int main()
 
         expected_link = next_expected_link;
     }
-    
+
     if (setup_dev.q != expected_link)
     {
         printf("Q was not advanced correctly.\n");
@@ -1057,6 +1057,157 @@ int main()
 
     printf(
         "TOKEN_BATCH generated and verified correctly.\n");
+
+    printf(
+        "\n---------------------- SPEND RESULT TEST ----------------------\n");
+
+    PaymentSystem invalid_token_ps = setup_ps;
+
+    const size_t test_batch_b_offset =
+        TOKEN_BATCH_BASE_SIZE +
+        ((size_t)setup_dev.ats * BLOCK_SIZE);
+
+    setup_dev.unicast_tsmt_buff[test_batch_b_offset] ^= 0x01U;
+
+    const puftoken_ret_t invalid_token_result =
+        puftoken_ps_token_batch_cb(
+            &invalid_token_ps,
+            setup_dev.unicast_tsmt_buff,
+            setup_dev.unicast_tsmt_len);
+
+    setup_dev.unicast_tsmt_buff[test_batch_b_offset] ^= 0x01U;
+
+    if (invalid_token_result != RET_OK)
+    {
+        printf("Invalid TOKEN_BATCH processing failed.\n");
+        return 1;
+    }
+
+    const size_t spend_result_status_offset =
+        MESSAGE_TYPE_SIZE + ID_SIZE;
+
+    if ((invalid_token_ps.ps_state !=
+         PS_WAIT_SPEND_REQUEST) ||
+        (invalid_token_ps.unicast_tsmt_len !=
+         SPEND_RESULT_BASE_SIZE) ||
+        (invalid_token_ps.unicast_tsmt_buff[spend_result_status_offset] !=
+         (uint8_t)STATUS_INVALID_TOKEN))
+    {
+        printf("Expected STATUS_INVALID_TOKEN.\n");
+        return 1;
+    }
+
+    printf("Invalid Bank token rejected correctly.\n");
+
+    const puf_link_t expected_new_q =
+        setup_dev.q;
+
+    const token_count_t expected_new_rl =
+        setup_dev.nrl;
+
+    const puftoken_ret_t final_result =
+        puftoken_ps_token_batch_cb(
+            &setup_ps,
+            setup_dev.unicast_tsmt_buff,
+            setup_dev.unicast_tsmt_len);
+
+    if (final_result != RET_OK)
+    {
+        printf("TOKEN_BATCH processing failed.\n");
+        return 1;
+    }
+
+    if ((setup_ps.ps_state != PS_WAIT_SPEND_REQUEST) ||
+        (setup_ps.unicast_is_present != 1U) ||
+        (setup_ps.unicast_tsmt_len !=
+         SPEND_RESULT_ACCEPT_SIZE))
+    {
+        printf("Payment System final state is invalid.\n");
+        return 1;
+    }
+
+    if ((setup_ps.dev_id != 0U) ||
+        (setup_ps.ats != 0U) ||
+        (setup_ps.q != 0U) ||
+        (setup_ps.rl != 0U) ||
+        (setup_ps.nrl != 0U))
+    {
+        printf("Payment System transaction context was not cleared.\n");
+        return 1;
+    }
+
+    size_t result_offset = 0U;
+
+    if (setup_ps.unicast_tsmt_buff[result_offset] !=
+        (uint8_t)SPEND_RESULT)
+    {
+        printf("Invalid SPEND_RESULT message type.\n");
+        return 1;
+    }
+
+    result_offset += MESSAGE_TYPE_SIZE;
+
+    const puftoken_id_t result_ps_id =
+        U8_TO_ID_BE(
+            &setup_ps.unicast_tsmt_buff[result_offset]);
+
+    result_offset += ID_SIZE;
+
+    if (result_ps_id != setup_ps.id)
+    {
+        printf("Invalid Payment System ID in SPEND_RESULT.\n");
+        return 1;
+    }
+
+    const puftoken_status_t final_status =
+        (puftoken_status_t)
+            setup_ps.unicast_tsmt_buff[result_offset];
+
+    result_offset += STATUS_SIZE;
+
+    if (final_status != STATUS_ACCEPT)
+    {
+        printf("Expected STATUS_ACCEPT.\n");
+        return 1;
+    }
+
+    puftoken_bank_signature_t received_new_state = {};
+
+    memcpy(
+        received_new_state.bytes,
+        &setup_ps.unicast_tsmt_buff[result_offset],
+        BANK_SIGNATURE_SIZE);
+
+    result_offset += BANK_SIGNATURE_SIZE;
+
+    if (result_offset != SPEND_RESULT_ACCEPT_SIZE)
+    {
+        printf("Invalid SPEND_RESULT size.\n");
+        return 1;
+    }
+
+    uint8_t expected_new_state[STATE_PLAINTEXT_SIZE] = {0U};
+
+    PUF_LINK_TO_U8_BE(
+        expected_new_q,
+        expected_new_state);
+
+    TOKEN_COUNT_TO_U8_BE(
+        expected_new_rl,
+        &expected_new_state[sizeof(puf_link_t)]);
+
+    if (puftoken_bank_verify(
+            &setup_ps.bank_public_key,
+            expected_new_state,
+            STATE_PLAINTEXT_SIZE,
+            &received_new_state) != RET_OK)
+    {
+        printf("New certified state is invalid.\n");
+        return 1;
+    }
+
+    printf(
+        "TOKEN_BATCH accepted and new state certified correctly.\n");
 
     puftoken_dev_cleanup(&dev);
     puftoken_dev_cleanup(&setup_dev);

@@ -33,7 +33,7 @@ typedef struct
     token_count_t rl;                  /* Current Remaining Links received from the Device */
     token_count_t nrl;                 /* New Remaining Links calculated as: NRL = RL - ATS */
 
-    uint8_t unicast_tsmt_buff[SPEND_AUTH_RESULT_OK_SIZE];   /* Buffer containing the next response to send to the Device */
+    uint8_t unicast_tsmt_buff[SPEND_RESULT_ACCEPT_SIZE];   /* Buffer containing the next response to send to the Device */
     uint32_t unicast_tsmt_len;         /* Number of valid bytes currently stored inside the transmission buffer */
     uint8_t unicast_is_present;        /* 0: no response available; 1: response ready to be sent */
 
